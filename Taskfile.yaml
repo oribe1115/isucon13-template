@@ -1,7 +1,58 @@
 version: '3'
 
+vars:
+  # 問題に応じて設定する必要がある変数
+  USER: isucon
+  BIN_NAME: 
+  BUILD_DIR: 
+  SERVICE_NAME:
+
+  # 基本共通の変数 -------
+  DB_PATH: /etc/mysql
+  NGINX_PATH: /etc/nginx
+  SYSTEMD_PATH: /etc/systemd/system
+
+  NGINX_LOG: /var/log/nginx/access.log
+  DB_SLOW_LOG: /var/log/mysql/mysql-slow.log
+
+  # http://localhost:19999/netdata.confのdirectories.webで確認可能
+  NETDATA_WEBROOT_PATH: /var/lib/netdata/www
+  NETDATA_CUSTOM_HTML: ~/tool-config/netdata/*
+
 tasks:
-  # setup:
   # bench:
   # pprof:
+  # fgprof:
   # send-data:
+
+  setup:
+    desc: インスタンスを立てたら最初に実行する
+    cmds:
+      - task: install-tools
+      - task: git-setup
+  get-conf:
+    desc: 設定ファイルを取得してgit管理下に配置する
+    # TODO
+
+  # 本番中直接実行しないもの ---------
+  install-tools:
+    vars: 
+      ALP_VERSION: v1.0.21
+    cmds:
+      - sudo apt update
+      - sudo apt upgrade
+      - sudo apt install -y percona-toolkit dstat git unzip snapd graphviz tree
+      # alpのインストール
+      - wget https://github.com/tkuchiki/alp/releases/download/{{.ALP_VERSION}}/alp_linux_amd64.zip
+      - unzip alp_linux_amd64.zip
+      - sudo install alp /usr/local/bin/alp
+      - rm alp_linux_amd64.zip alp
+      # netdataのインストール
+      - wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates --stable-channel --disable-telemetry
+  
+  git-setup:
+    cmds:
+      - git config --global user.email "isucon@example.com"
+      - git config --global user.name "isucon"
+      # deploykeyの作成
+      - ssh-keygen -t ed25519
