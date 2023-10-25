@@ -6,6 +6,7 @@ vars:
   BIN_NAME: 
   BUILD_DIR: 
   SERVICE_NAME:
+  ENV_FILE:
 
   # 基本共通の変数 -------
   DB_PATH: /etc/mysql
@@ -19,6 +20,9 @@ vars:
   NETDATA_WEBROOT_PATH: /var/lib/netdata/www
   NETDATA_CUSTOM_HTML: ~/tool-config/netdata/*
 
+env:
+  SERVER_ID: s1
+
 tasks:
   # bench:
   # pprof:
@@ -30,9 +34,15 @@ tasks:
     cmds:
       - task: install-tools
       - task: git-setup
+      
   get-conf:
     desc: 設定ファイルを取得してgit管理下に配置する
-    # TODO
+    cmds:
+      - task: check-server-id
+      - task: get-db-conf
+      - task: get-nginx-conf
+      - task: get-service-file
+      - task: get-env-file
 
   # 本番中直接実行しないもの ---------
   install-tools:
@@ -63,8 +73,37 @@ tasks:
       # deploykeyの作成
       - ssh-keygen -t ed25519
   
+  # 環境変数SERVER_IDが登録されているかを検証する
+  # SERVER_IDの値を使うコマンドでは、基本preconditionsで呼ぶようにする
   check-server-id:
     preconditions:
       - sh: '[ $SERVER_ID != "" ]'
         msg: Env SERVER_ID is unset
-    cmd: echo serve id $SERVER_ID
+    cmd: echo "SERVER_ID = $SERVER_ID"
+  
+  get-db-conf:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp -R {{.DB_PATH}}/* ./$SERVER_ID/etc/mysql
+      - sudo chown {{.USER}} -R ./$SERVER_ID/etc/mysql
+  
+  get-nginx-conf:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp -R {{.NGINX_PATH}}/* ./$SERVER_ID/etc/nginx
+      - sudo chown {{.USER}} -R ./$SERVER_ID/etc/nginx
+  
+  get-service-file:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
+      - sudo chown {{.USER}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
+  
+  get-env-file:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - cp ~/{{.ENV_FILE}} ./$SERVER_ID/home/isucon/{{.ENV_FILE}}
