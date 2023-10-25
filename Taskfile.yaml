@@ -38,10 +38,16 @@ tasks:
   install-tools:
     vars: 
       ALP_VERSION: v1.0.21
+      DOOL_VERSION: "1.3.0"
     cmds:
       - sudo apt update
       - sudo apt upgrade
-      - sudo apt install -y percona-toolkit dstat git unzip snapd graphviz tree
+      - sudo apt install -y percona-toolkit git unzip snapd graphviz tree wget
+      # doolのインストール
+      - wget -O dtool.zip https://github.com/scottchiefbaker/dool/archive/refs/tags/v{{.DOOL_VERSION}}.zip
+      - unzip dool.zip
+      - cd dool/dool-{{.DOOL_VERSION}} && python install.py
+      - rm dool.zip dool
       # alpのインストール
       - wget https://github.com/tkuchiki/alp/releases/download/{{.ALP_VERSION}}/alp_linux_amd64.zip
       - unzip alp_linux_amd64.zip
