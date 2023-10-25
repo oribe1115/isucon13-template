@@ -62,3 +62,9 @@ tasks:
       - git config --global user.name "isucon"
       # deploykeyの作成
       - ssh-keygen -t ed25519
+  
+  check-server-id:
+    preconditions:
+      - sh: '[ $SERVER_ID != "" ]'
+        msg: Env SERVER_ID is unset
+    cmd: echo serve id $SERVER_ID
