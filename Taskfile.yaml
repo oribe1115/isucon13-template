@@ -300,6 +300,9 @@ tasks:
     cmds:
       - echo "Done. {{.LATEST}} created" | discocat
 
-  test:
+  set-server-id:
+    preconditions:
+      - sh: '[ {{.NEW_SERVER_ID}} != "" ]'
+        msg: e.g. task -g set-server-id NEW_SERVER_ID=s1 
     cmds:
-      - task check-server-id >> test.txt
+      - echo "\nSERVER_ID={{.NEW_SERVER_ID}}" >> {{.ENV_FILE}}
