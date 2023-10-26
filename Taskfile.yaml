@@ -148,7 +148,10 @@ tasks:
       - rm alp_linux_amd64.zip alp
       # netdataのインストール
       - wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates --stable-channel --disable-telemetry
-  
+      # discocatのインストール
+      - go install github.com/wan-nyan-wan/discocat@latest
+      - echo "Write ~/.config/discocat.yml"
+
   git-setup:
     cmds:
       - git config --global user.email "isucon@example.com"
