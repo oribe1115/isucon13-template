@@ -139,13 +139,13 @@ tasks:
       # doolのインストール
       - wget -O dool.zip https://github.com/scottchiefbaker/dool/archive/refs/tags/v{{.DOOL_VERSION}}.zip
       - unzip dool.zip
-      - cd dool/dool-{{.DOOL_VERSION}} && python install.py
-      - rm dool.zip dool
+      - cd dool-{{.DOOL_VERSION}} && python install.py
+      - rm -rf dool.zip dool-{{.DOOL_VERSION}}
       # alpのインストール
       - wget https://github.com/tkuchiki/alp/releases/download/{{.ALP_VERSION}}/alp_linux_amd64.zip
       - unzip alp_linux_amd64.zip
       - sudo install alp /usr/local/bin/alp
-      - rm alp_linux_amd64.zip alp
+      - rm -rf alp_linux_amd64.zip alp
       # netdataのインストール
       - wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates --stable-channel --disable-telemetry
       # discocatのインストール
@@ -281,20 +281,31 @@ tasks:
       - task: check-server-id
     cmds:
       - task: refresh-discocat-buf
-      - for: sources
-        task: command-output-to-discocat-buf
+      - task: command-output-to-discocat-buf
         vars:
-          COMMAND: "{{.ITEM}}"
+          COMMAND: echo "----------------------------------------------------------------"
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: echo "SERVER_ID = $SERVER_ID"
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: git branch --contains=HEAD
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: TZ=JST-9 date
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: echo ""
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: git show -s
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
       - task: send-buf-to-discord
-    sources:
-      - echo "----------------------------------------------------------------"
-      - cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
-      - echo "SERVER_ID = $SERVER_ID"
-      - git branch --contains=HEAD
-      - TZ=JST-9 date
-      - echo ""
-      - git show -s
-      - cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
 
   discocat-latest-recoding-file:
     vars:
@@ -308,4 +319,5 @@ tasks:
       - sh: '[ {{.NEW_SERVER_ID}} != "" ]'
         msg: e.g. task -g set-server-id NEW_SERVER_ID=s1 
     cmds:
-      - echo "\nSERVER_ID={{.NEW_SERVER_ID}}" >> {{.ENV_FILE}}
+      - echo "" >> {{.ENV_FILE}}
+      - echo "SERVER_ID={{.NEW_SERVER_ID}}" >> {{.ENV_FILE}}
