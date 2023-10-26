@@ -17,8 +17,11 @@ vars:
   DB_SLOW_LOG: /var/log/mysql/mysql-slow.log
 
   # http://localhost:19999/netdata.confのdirectories.webで確認可能
-  NETDATA_WEBROOT_PATH: /var/lib/netdata/www
+  NETDATA_WEBROOT_PATH: /var/lib/netdata/www/
   NETDATA_CUSTOM_HTML: ~/tool-config/netdata/*
+
+  DISCOCAT_TRIPLE_BACK_QUOTES: ~/tool-config/discocat/triple-back-quotes.txt
+  DISCOCAT_TMPFILE: ~/tmp/discocat
 
 dotenv:
   - "{{.ENV_FILE}}"
@@ -28,7 +31,8 @@ tasks:
     desc: ベンチマーク実行前に全インスタンスで実行する
     cmds:
       - task: check-server-id
-      # - task: discocat-now-status
+      - task: check-commit
+      - task: discocat-now-status
       - task: delete-logs
       - task: deploy-conf
       - task: build
@@ -38,16 +42,16 @@ tasks:
   pprof:
     desc: pprofで記録する
     cmds:
-      # discocatで送信
+      - echo "pprof recording..." | discocat
       - go tool pprof -top http://localhost:6060/debug/pprof/profile
-      # 作成されたものの情報をdiscocatで送信
+      - task: discocat-latest-recoding-file
 
   fgprof:
     desc: fgprofで記録する
     cmds:
-      # discocatで送信
+      - echo "fgprof recording..." | discocat
       - go tool pprof -top http://localhost:6060/debug/fgprof
-      # 作成されたものの情報をdiscocatで送信
+      - task: discocat-latest-recoding-file
   
   pprof-check:
     desc: pprof/fgprofでの最新データを確認する
@@ -57,7 +61,45 @@ tasks:
     cmds:
       - go tool pprof -http=localhost:8090 pprof/{{.LATEST}}
 
-  # send-data:
+  slow-query:
+    # desc: slow queryの分析結果を出力する
+    cmds:
+      - sudo pt-query-digest --filter 'length($$event->{arg}) <= 2000' {{.DB_SLOW_LOG}}
+
+  alp:
+    # desc: alpでの分析結果を出力する
+    cmds:
+      - sudo alp ltsv --file={{.NGINX_LOG}} --config=~/tool-config/alp/config.yml
+
+  discocat-alp:
+    desc: alpの分析結果をDiscordに送る
+    cmds:
+      - task: refresh-discocat-buf
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: echo "SERVER_ID = $SERVER_ID\n"
+      - task: task-output-to-discocat-buf
+        vars:
+          TASK_COMMAND: alp
+      - task: send-buf-to-discord
+  
+  discocat-slow-query:
+    desc: slow queryの分析結果をDiscordに送る
+    cmds:
+      - task: refresh-discocat-buf
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: echo "SERVER_ID = $SERVER_ID\n"
+      - task: task-output-to-discocat-buf
+        vars:
+          TASK_COMMAND: slow-query
+      - task: send-buf-to-discord
+
+  send-analysis:
+    desc: alp, slow queryの分析結果をDiscordに送信する
+    cmds:
+      - task: discocat-alp
+      - task: discocat-slow-query
 
   # 各情報の環境変数名が回によって違うので要注意
   mysql:
@@ -66,13 +108,18 @@ tasks:
       - mysql -h $MYSQL_HOST -P MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS $MYSQL_DBNAME
 
   setup:
-    desc: インスタンスを立てたら最初に実行する
+    # desc: インスタンスを立てたら最初に実行する
     cmds:
       - task: install-tools
       - task: git-setup
+  
+  netdata-setup:
+    # desc: netdataの設定ファイルを配置する
+    cmds:
+      - sudo cp {{.NETDATA_CUSTUM_HTML}} {{.NETDATA_WEBROOT_PATH}}
 
   get-conf:
-    desc: 設定ファイルを取得してgit管理下に配置する
+    # desc: 設定ファイルを取得してgit管理下に配置する
     cmds:
       - task: check-server-id
       - task: get-db-conf
@@ -194,6 +241,64 @@ tasks:
   watch-service-log:
     cmds:
       - sudo journalctl -u {{.SERVICE_NAME}} -n10 -f
+
+  check-commit:
+    cmds:
+      - mkdir -p tmp/check-commit
+      - go run ~/tool-config/check-commit/main.go
+  
+  send-buf-to-discord:
+    cmds:
+      - cat {{.DISCOCAT_TMPFILE}} | discocat
+
+  refresh-discocat-buf:
+    cmds:
+      - rm -f {{.DISCOCAT_TMPFILE}}
+      - mkdir -p ~/tmp
+      - touch {{.DISCOCAT_TMPFILE}}
+
+  command-output-to-discocat-buf:
+    requires:
+      vars:
+        - COMMAND
+    cmds:
+      - "{{.COMMAND}} >> {{.DISCOCAT_TMPFILE}}"
+        
+  task-output-to-discocat-buf:
+    requires:
+      vars:
+        - TASK_COMMAND
+    cmds:
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: task -g {{.TASK_COMMAND}}
+  
+  discocat-now-status:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - task: refresh-discocat-buf
+      - for: sources
+        task: command-output-to-discocat-buf
+        vars:
+          COMMAND: "{{.ITEM}}"
+      - task: send-buf-to-discord
+    sources:
+      - echo "----------------------------------------------------------------"
+      - cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
+      - echo "SERVER_ID = $SERVER_ID"
+      - git branch --contains=HEAD
+      - TZ=JST-9 date
+      - echo ""
+      - git show -s
+      - cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
+
+  discocat-latest-recoding-file:
+    vars:
+      LATEST:
+        sh: ls -rt ~/pprof/ | tail -n 1
+    cmds:
+      - echo "Done. {{.LATEST}} created" | discocat
 
   test:
     cmds:
