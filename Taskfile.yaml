@@ -6,7 +6,7 @@ vars:
   BIN_NAME: 
   BUILD_DIR: 
   SERVICE_NAME:
-  ENV_FILE:
+  ENV_FILE: .env
 
   # 基本共通の変数 -------
   DB_PATH: /etc/mysql
@@ -20,8 +20,8 @@ vars:
   NETDATA_WEBROOT_PATH: /var/lib/netdata/www
   NETDATA_CUSTOM_HTML: ~/tool-config/netdata/*
 
-env:
-  SERVER_ID: s1
+dotenv:
+  - "{{.ENV_FILE}}"
 
 tasks:
   bench:
