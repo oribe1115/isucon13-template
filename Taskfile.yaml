@@ -24,7 +24,17 @@ env:
   SERVER_ID: s1
 
 tasks:
-  # bench:
+  bench:
+    desc: ベンチマーク実行前に全インスタンスで実行する
+    cmds:
+      - task: check-server-id
+      # - task: discocat-now-status
+      - task: delete-logs
+      - task: deploy-conf
+      - task: build
+      - task: restart
+      - task: watch-service-log
+
   # pprof:
   # fgprof:
   # send-data:
@@ -138,6 +148,26 @@ tasks:
   deploy-envfile:
     preconditions:
       - task: check-server-id
+
+  delete-logs:
+    cmds:
+      - sudo rm -f {{.NGINX_LOG}}
+      - sudo rm -f {{.DB_SLOW_LOG}}
+  
+  build:
+    cmds:
+      - cd {{.BUILD_DIR}} && go build -o {{.BIN_NAME}}
+
+  restart:
+    cmds:
+      - sudo systemctl daemon-reload
+      - sudo systemctl restart {{.SERVICE_NAME}}
+      - sudo systemctl restart mysql
+      - sudo systemctl restart nginx
+
+  watch-service-log:
+    cmds:
+      - sudo journalctl -u {{.SERVICE_NAME}} -n10 -f
 
   test:
     cmds:
