@@ -35,8 +35,28 @@ tasks:
       - task: restart
       - task: watch-service-log
 
-  # pprof:
-  # fgprof:
+  pprof:
+    desc: pprofで記録する
+    cmds:
+      # discocatで送信
+      - go tool pprof -top http://localhost:6060/debug/pprof/profile
+      # 作成されたものの情報をdiscocatで送信
+
+  fgprof:
+    desc: fgprofで記録する
+    cmds:
+      # discocatで送信
+      - go tool pprof -top http://localhost:6060/debug/fgprof
+      # 作成されたものの情報をdiscocatで送信
+  
+  pprof-check:
+    desc: pprof/fgprofでの最新データを確認する
+    vars:
+      LATEST:
+        sh: ls -rt pprof/ | tail -n 1
+    cmds:
+      - go tool pprof -http=localhost:8090 pprof/{{.LATEST}}
+
   # send-data:
 
   setup:
