@@ -137,7 +137,7 @@ tasks:
       - sudo apt upgrade
       - sudo apt install -y percona-toolkit git unzip snapd graphviz tree wget
       # doolのインストール
-      - wget -O dtool.zip https://github.com/scottchiefbaker/dool/archive/refs/tags/v{{.DOOL_VERSION}}.zip
+      - wget -O dool.zip https://github.com/scottchiefbaker/dool/archive/refs/tags/v{{.DOOL_VERSION}}.zip
       - unzip dool.zip
       - cd dool/dool-{{.DOOL_VERSION}} && python install.py
       - rm dool.zip dool
