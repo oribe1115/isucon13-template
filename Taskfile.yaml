@@ -34,7 +34,7 @@ tasks:
     cmds:
       - task: install-tools
       - task: git-setup
-      
+
   get-conf:
     desc: 設定ファイルを取得してgit管理下に配置する
     cmds:
@@ -85,25 +85,60 @@ tasks:
     preconditions:
       - task: check-server-id
     cmds:
-      - sudo cp -R {{.DB_PATH}}/* ./$SERVER_ID/etc/mysql
-      - sudo chown {{.USER}} -R ./$SERVER_ID/etc/mysql
+      - sudo cp -R {{.DB_PATH}}/* ~/$SERVER_ID/etc/mysql
+      - sudo chown {{.USER}} -R ~/$SERVER_ID/etc/mysql
   
   get-nginx-conf:
     preconditions:
       - task: check-server-id
     cmds:
-      - sudo cp -R {{.NGINX_PATH}}/* ./$SERVER_ID/etc/nginx
-      - sudo chown {{.USER}} -R ./$SERVER_ID/etc/nginx
+      - sudo cp -R {{.NGINX_PATH}}/* ~/$SERVER_ID/etc/nginx
+      - sudo chown {{.USER}} -R ~/$SERVER_ID/etc/nginx
   
   get-service-file:
     preconditions:
       - task: check-server-id
     cmds:
-      - sudo cp {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
-      - sudo chown {{.USER}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
+      - sudo cp {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}} ~/$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
+      - sudo chown {{.USER}} ~/$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
   
   get-env-file:
     preconditions:
       - task: check-server-id
     cmds:
-      - cp ~/{{.ENV_FILE}} ./$SERVER_ID/home/isucon/{{.ENV_FILE}}
+      - cp ~/{{.ENV_FILE}} ~/$SERVER_ID/home/isucon/{{.ENV_FILE}}
+  
+  # 設定ファイルの配置
+  deploy-conf:
+    cmds:
+      - task: check-server-id
+      - task: deploy-db-conf
+      - task: deploy-nginx-conf
+      - task: deploy-service-file
+      - task: deploy-envfile
+
+  deploy-db-conf:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp -R ~/$SERVER_ID/etc/mysql/* {{.DB_PATH}}
+  
+  deploy-nginx-conf:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp -R ~/$SERVER_ID/etc/nginx/* {{.NGINX_PATH}}
+
+  deploy-service-file:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp ~/$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}} {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}}
+
+  deploy-envfile:
+    preconditions:
+      - task: check-server-id
+
+  test:
+    cmds:
+      - task check-server-id >> test.txt
