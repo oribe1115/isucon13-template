@@ -59,6 +59,12 @@ tasks:
 
   # send-data:
 
+  # 各情報の環境変数名が回によって違うので要注意
+  mysql:
+    desc: mysqlに接続する (環境変数名を要確認)
+    cmds:
+      - mysql -h $MYSQL_HOST -P MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS $MYSQL_DBNAME
+
   setup:
     desc: インスタンスを立てたら最初に実行する
     cmds:
