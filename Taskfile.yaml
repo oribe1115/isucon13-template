@@ -64,12 +64,12 @@ tasks:
   slow-query:
     # desc: slow queryの分析結果を出力する
     cmds:
-      - sudo pt-query-digest --filter 'length($$event->{arg}) <= 2000' {{.DB_SLOW_LOG}}
+      - sudo pt-query-digest --filter 'length($event->{arg}) <= 2000' {{.DB_SLOW_LOG}}
 
   alp:
     # desc: alpでの分析結果を出力する
     cmds:
-      - sudo alp ltsv --file={{.NGINX_LOG}} --config=./tool-config/alp/config.yml
+      - sudo alp ltsv --file={{.NGINX_LOG}} --config=./tool-config/alp/config.yaml
 
   discocat-alp:
     desc: alpの分析結果をDiscordに送る
@@ -77,10 +77,16 @@ tasks:
       - task: refresh-discocat-buf
       - task: command-output-to-discocat-buf
         vars:
-          COMMAND: echo "SERVER_ID = $SERVER_ID\n"
+          COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: echo "SERVER_ID = $SERVER_ID"
       - task: task-output-to-discocat-buf
         vars:
           TASK_COMMAND: alp
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
       - task: send-buf-to-discord
   
   discocat-slow-query:
@@ -89,10 +95,16 @@ tasks:
       - task: refresh-discocat-buf
       - task: command-output-to-discocat-buf
         vars:
-          COMMAND: echo "SERVER_ID = $SERVER_ID\n"
+          COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: echo "SERVER_ID = $SERVER_ID"
       - task: task-output-to-discocat-buf
         vars:
           TASK_COMMAND: slow-query
+      - task: command-output-to-discocat-buf
+        vars:
+          COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
       - task: send-buf-to-discord
 
   send-analysis:
@@ -105,7 +117,7 @@ tasks:
   mysql:
     desc: mysqlに接続する (環境変数名を要確認)
     cmds:
-      - mysql -h $MYSQL_HOST -P MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS $MYSQL_DBNAME
+      - mysql -h $MYSQL_HOST -P $MYSQL_PORT -u $MYSQL_USER -p$MYSQL_PASS $MYSQL_DBNAME
 
   setup:
     # desc: インスタンスを立てたら最初に実行する
@@ -116,7 +128,7 @@ tasks:
   netdata-setup:
     # desc: netdataの設定ファイルを配置する
     cmds:
-      - sudo cp {{.NETDATA_CUSTUM_HTML}} {{.NETDATA_WEBROOT_PATH}}
+      - sudo cp {{.NETDATA_CUSTOM_HTML}} {{.NETDATA_WEBROOT_PATH}}
 
   get-conf:
     # desc: 設定ファイルを取得してgit管理下に配置する
@@ -224,6 +236,8 @@ tasks:
   deploy-envfile:
     preconditions:
       - task: check-server-id
+    cmds:
+      - cp ~/$SERVER_ID/home/isucon/{{.ENV_FILE}} ~/{{.ENV_FILE}}
 
   delete-logs:
     cmds:
