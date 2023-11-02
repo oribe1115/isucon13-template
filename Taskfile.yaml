@@ -38,28 +38,56 @@ tasks:
       - task: build
       - task: restart
       - task: watch-service-log
+  
+  prof:
+    desc: pprofとfgprofで記録する
+    deps:
+      - task: pprof
+      - task: fgprof
 
   pprof:
-    desc: pprofで記録する
+    # desc: pprofで記録する
+    env:
+      PPROF_TMPDIR: ~/pprof
     cmds:
       - echo "pprof recording..." | discocat
       - go tool pprof -top http://localhost:6060/debug/pprof/profile
       - task: discocat-latest-recoding-file
+        vars:
+          PROF_TYPE: pprof
 
   fgprof:
-    desc: fgprofで記録する
+    # desc: fgprofで記録する
+    env:
+      PPROF_TMPDIR: ~/fgprof
     cmds:
       - echo "fgprof recording..." | discocat
       - go tool pprof -top http://localhost:6060/debug/fgprof
       - task: discocat-latest-recoding-file
+        vars:
+          PROF_TYPE: fgprof
+  
+  prof-check:
+    desc: pprofとfgprofのそれぞれの最新データを確認する
+    deps:
+      - task: pprof-check
+      - task: fgprof-check
   
   pprof-check:
-    desc: pprof/fgprofでの最新データを確認する
+    # desc: pprofでの最新データを確認する
     vars:
       LATEST:
         sh: ls -rt ~/pprof/ | tail -n 1
     cmds:
       - go tool pprof -http=localhost:8090 ~/pprof/{{.LATEST}}
+  
+  fgprof-check:
+    # desc: fgprofでの最新データを確認する
+    vars:
+      LATEST:
+        sh: ls -rt ~/fgprof/ | tail -n 1
+    cmds:
+      - go tool pprof -http=localhost:9090 ~/fgprof/{{.LATEST}}
 
   slow-query:
     # desc: slow queryの分析結果を出力する
@@ -322,11 +350,14 @@ tasks:
       - task: send-buf-to-discord
 
   discocat-latest-recoding-file:
+    requires:
+      vars:
+        - PROF_TYPE
     vars:
       LATEST:
-        sh: ls -rt ~/pprof/ | tail -n 1
+        sh: ls -rt ~/{{.PROF_TYPE}}/ | tail -n 1
     cmds:
-      - echo "Done. {{.LATEST}} created" | discocat
+      - echo "Done. {{.PROF_TYPE}}/{{.LATEST}} created" | discocat
 
   set-server-id:
     preconditions:
