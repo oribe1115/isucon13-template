@@ -24,7 +24,7 @@ vars:
   DISCOCAT_TMPFILE: ~/tmp/discocat
 
 dotenv:
-  - "~/{{.ENV_FILE}}"
+  - "{{.ENV_FILE}}"
 
 tasks:
   bench:
