@@ -280,9 +280,13 @@ tasks:
       - sudo cp {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
       - sudo chown {{.USER}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
   
+  # OSのバージョンによって環境が違う可能性があるので注意
   get-kernel-file:
     preconditions:
       - task: check-server-id
+    cmds:
+      - sudo cp {{.LIMITS_PATH}} ./$SERVER_ID/etc/security/limits.d/{{.LIMITS_NAME}}
+      - sudo cp {{.SYSCTLD_PATH}} ./$SERVER_ID/etc/sysctl.d/{{.SYSCTLD_NAME}}
   
   get-env-file:
     preconditions:
@@ -297,7 +301,7 @@ tasks:
       - task: deploy-db-conf
       - task: deploy-nginx-conf
       - task: deploy-service-file
-      - task: deploy-kernel-file
+      #- task: deploy-kernel-file
       - task: deploy-envfile
 
   deploy-db-conf:
@@ -318,6 +322,7 @@ tasks:
     cmds:
       - sudo cp ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}} {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}}
 
+  # OSのバージョンによって環境が違う可能性があるので注意
   deploy-kernel-file:
     preconditions:
       - task: check-server-id
