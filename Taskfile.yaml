@@ -12,6 +12,10 @@ vars:
   DB_PATH: /etc/mysql
   NGINX_PATH: /etc/nginx
   SYSTEMD_PATH: /etc/systemd/system
+  LIMITS_PATH: /etc/security/limits.d/
+  LIMITS_NAME: isuconlimits.conf
+  SYSCTLD_PATH: /etc/sysctl.d/
+  SYSCTLD_NAME: 100-isucon.conf
 
   NGINX_LOG: /var/log/nginx/access.log
   DB_SLOW_LOG: /var/log/mysql/mysql-slow.log
@@ -48,7 +52,7 @@ tasks:
   pprof:
     # desc: pprofで記録する
     env:
-      PPROF_TMPDIR: ~/pprof
+      PPROF_TMPDIR: /home/isucon/pprof
     cmds:
       - echo "pprof recording..." | discocat
       - go tool pprof -top http://localhost:6060/debug/pprof/profile
@@ -59,7 +63,7 @@ tasks:
   fgprof:
     # desc: fgprofで記録する
     env:
-      PPROF_TMPDIR: ~/fgprof
+      PPROF_TMPDIR: /home/isucon/fgprof
     cmds:
       - echo "fgprof recording..." | discocat
       - go tool pprof -top http://localhost:6060/debug/fgprof
@@ -72,9 +76,21 @@ tasks:
     deps:
       - task: pprof-check
       - task: fgprof-check
-  
+
+  kill-pprof:
+    status:
+      - sh -c "! sudo lsof -sTCP:LISTEN -i :8090"
+    cmd: sudo lsof -sTCP:LISTEN -t -i :8090 | xargs sudo kill -9
+
+  kill-fgprof:
+    status:
+      - sh -c "! sudo lsof -sTCP:LISTEN -i :9090"
+    cmd: sudo lsof -sTCP:LISTEN -t -i :9090 | xargs sudo kill -9
+
   pprof-check:
     # desc: pprofでの最新データを確認する
+    deps:
+      - kill-pprof
     vars:
       LATEST:
         sh: ls -rt ~/pprof/ | tail -n 1
@@ -83,6 +99,8 @@ tasks:
   
   fgprof-check:
     # desc: fgprofでの最新データを確認する
+    deps:
+      - kill-fgprof
     vars:
       LATEST:
         sh: ls -rt ~/fgprof/ | tail -n 1
@@ -92,7 +110,7 @@ tasks:
   slow-query:
     # desc: slow queryの分析結果を出力する
     cmds:
-      - sudo pt-query-digest --filter 'length($event->{arg}) <= 2000' {{.DB_SLOW_LOG}}
+      - sudo pt-query-digest {{.DB_SLOW_LOG}} | cut -c -1000
 
   alp:
     # desc: alpでの分析結果を出力する
@@ -135,7 +153,7 @@ tasks:
           COMMAND: cat {{.DISCOCAT_TRIPLE_BACK_QUOTES}}
       - task: send-buf-to-discord
 
-  send-analysis:
+  analyze:
     desc: alp, slow queryの分析結果をDiscordに送信する
     cmds:
       - task: discocat-alp
@@ -152,6 +170,7 @@ tasks:
     cmds:
       - task: install-tools
       - task: git-setup
+      - task: swap-setup
   
   netdata-setup:
     # desc: netdataの設定ファイルを配置する
@@ -165,7 +184,30 @@ tasks:
       - task: get-db-conf
       - task: get-nginx-conf
       - task: get-service-file
+      - task: get-kernel-file
       - task: get-env-file
+  
+  # 最初のインスタンスで実装をgitリポジトリに入れるために実行する
+  gitrepo-1st:
+    cmds:
+      - git config --global init.defaultBranch main
+      - git init
+      - git remote add origin {{.GIT_REPOSITORY}}
+      - git pull origin main
+      - git branch -m main
+      - echo "Setup gitignore and variables in Taskfile.yaml"
+  
+  # 2代目の以降のインスタンスでのgitのセットアップ
+  gitrepo-nst:
+    cmds:
+      - git config --global init.defaultBranch main
+      - git init
+      - git remote add origin {{.GIT_REPOSITORY}}
+      - cmd: git pull origin main
+        ignore_error: true
+      - git fetch origin main
+      - git reset --hard FETCH_HEAD
+      - git branch -m main
 
   # 本番中直接実行しないもの ---------
   install-tools:
@@ -198,7 +240,17 @@ tasks:
       - git config --global user.name "isucon"
       # deploykeyの作成
       - ssh-keygen -t ed25519
-  
+
+  swap-setup:
+    status:
+      - sudo swapon --show | read REPLY
+    cmds:
+      - sudo fallocate -l 2G /swapfile
+      - sudo chmod 600 /swapfile
+      - sudo mkswap /swapfile
+      - sudo swapon /swapfile
+      - echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
   # 環境変数SERVER_IDが登録されているかを検証する
   # SERVER_IDの値を使うコマンドでは、基本preconditionsで呼ぶようにする
   check-server-id:
@@ -228,6 +280,14 @@ tasks:
       - sudo cp {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
       - sudo chown {{.USER}} ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}}
   
+  # OSのバージョンによって環境が違う可能性があるので注意
+  get-kernel-file:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp {{.LIMITS_PATH}} ./$SERVER_ID/etc/security/limits.d/{{.LIMITS_NAME}}
+      - sudo cp {{.SYSCTLD_PATH}} ./$SERVER_ID/etc/sysctl.d/{{.SYSCTLD_NAME}}
+  
   get-env-file:
     preconditions:
       - task: check-server-id
@@ -241,6 +301,7 @@ tasks:
       - task: deploy-db-conf
       - task: deploy-nginx-conf
       - task: deploy-service-file
+      #- task: deploy-kernel-file
       - task: deploy-envfile
 
   deploy-db-conf:
@@ -261,6 +322,16 @@ tasks:
     cmds:
       - sudo cp ./$SERVER_ID/etc/systemd/system/{{.SERVICE_NAME}} {{.SYSTEMD_PATH}}/{{.SERVICE_NAME}}
 
+  # OSのバージョンによって環境が違う可能性があるので注意
+  deploy-kernel-file:
+    preconditions:
+      - task: check-server-id
+    cmds:
+      - sudo cp ./$SERVER_ID/etc/security/limits.d/{{.LIMITS_NAME}} {{.LIMITS_PATH}}
+      - sh -c "ulimit -a >/dev/null"
+      - sudo cp ./$SERVER_ID/etc/sysctl.d/{{.SYSCTLD_NAME}} {{.SYSCTLD_PATH}}
+      - sudo sysctl --system >/dev/null
+      
   deploy-envfile:
     preconditions:
       - task: check-server-id
@@ -282,10 +353,13 @@ tasks:
       - sudo systemctl restart {{.SERVICE_NAME}}
       - sudo systemctl restart mysql
       - sudo systemctl restart nginx
+      # 特定のサーバーでだけ実行したい場合の例
+      # - sh -c "if [ $SERVER_ID = "s1" ]; then (sudo systemctl restart nginx) fi"
 
   watch-service-log:
+    desc: アプリのログを見る
     cmds:
-      - sudo journalctl -u {{.SERVICE_NAME}} -n10 -f
+      - sudo journalctl -u {{.SERVICE_NAME}} -n20 -f
 
   check-commit:
     cmds:
@@ -366,3 +440,8 @@ tasks:
     cmds:
       - echo "" >> ~/{{.ENV_FILE}}
       - echo "SERVER_ID={{.NEW_SERVER_ID}}" >> ~/{{.ENV_FILE}}
+
+  dool:
+    desc: doolを見たい情報のオプション付きで実行する
+    cmds:
+      - dool --cpu --mem  --disk --net --proc --io
