@@ -5,8 +5,10 @@ vars:
   USER: isucon
   BIN_NAME: 
   BUILD_DIR: 
-  SERVICE_NAME:
-  ENV_FILE: .env
+  SERVICE_NAME: 
+  ENV_FILE: 
+
+  GIT_REPOSITORY: 
 
   # 基本共通の変数 -------
   DB_PATH: /etc/mysql
@@ -184,8 +186,8 @@ tasks:
       - task: get-db-conf
       - task: get-nginx-conf
       - task: get-service-file
-      - task: get-kernel-file
       - task: get-env-file
+      # - task: get-kernel-file
   
   # 最初のインスタンスで実装をgitリポジトリに入れるために実行する
   gitrepo-1st:
@@ -195,6 +197,7 @@ tasks:
       - git remote add origin {{.GIT_REPOSITORY}}
       - git pull origin main
       - git branch -m main
+      - git branch --set-upstream-to=origin/main main
       - echo "Setup gitignore and variables in Taskfile.yaml"
   
   # 2代目の以降のインスタンスでのgitのセットアップ
@@ -208,6 +211,7 @@ tasks:
       - git fetch origin main
       - git reset --hard FETCH_HEAD
       - git branch -m main
+      - git branch --set-upstream-to=origin/main main
 
   # 本番中直接実行しないもの ---------
   install-tools:
@@ -329,8 +333,8 @@ tasks:
     cmds:
       - sudo cp ./$SERVER_ID/etc/security/limits.d/{{.LIMITS_NAME}} {{.LIMITS_PATH}}
       - sh -c "ulimit -a >/dev/null"
-      - sudo cp ./$SERVER_ID/etc/sysctl.d/{{.SYSCTLD_NAME}} {{.SYSCTLD_PATH}}
-      - sudo sysctl --system >/dev/null
+      # - sudo cp ./$SERVER_ID/etc/sysctl.d/{{.SYSCTLD_NAME}} {{.SYSCTLD_PATH}}
+      # - sudo sysctl --system >/dev/null
       
   deploy-envfile:
     preconditions:
