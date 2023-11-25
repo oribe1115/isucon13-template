@@ -1,6 +1,6 @@
-# ISUCON12 Template
+# ISUCON13 Template
 
-ISUCON12用リポジトリテンプレート
+ISUCON13用リポジトリテンプレート
 
 `/home/isucon`に展開する前提
 
